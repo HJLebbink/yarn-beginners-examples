@@ -181,19 +181,19 @@ public class MyApplicationMaster {
 
 		// Initialize clients to ResourceManager and NodeManagers
 		final AMRMClient<ContainerRequest> amRMClient = AMRMClient.createAMRMClient();
-		amRMClient.init(conf);
+		amRMClient.init(this.conf);
 		amRMClient.start();
 
 		// Register with ResourceManager
 		amRMClient.registerApplicationMaster("", 0, "");
 
 		// Set up resource type requirements for Container
-		Resource capability = Records.newRecord(Resource.class);
+		final Resource capability = Records.newRecord(Resource.class);
 		capability.setMemory(containerMemory);
 		capability.setVirtualCores(containerVirtualCores);
 
 		// Priority for worker containers - priorities are intra-application
-		Priority priority = Records.newRecord(Priority.class);
+		final Priority priority = Records.newRecord(Priority.class);
 		priority.setPriority(requestPriority);
 
 		// Make container requests to ResourceManager
@@ -202,16 +202,16 @@ public class MyApplicationMaster {
 			amRMClient.addContainerRequest(containerAsk);
 		}
 
-		NMClient nmClient = NMClient.createNMClient();
-		nmClient.init(conf);
+		final NMClient nmClient = NMClient.createNMClient();
+		nmClient.init(this.conf);
 		nmClient.start();
 
 		// Setup CLASSPATH for Container
-		Map<String, String> containerEnv = new HashMap<String, String>();
+		final Map<String, String> containerEnv = new HashMap<String, String>();
 		containerEnv.put("CLASSPATH", "./*");
 
 		// Setup ApplicationMaster jar file for Container
-		LocalResource appMasterJar = createAppMasterJar();
+		LocalResource appMasterJar = this.createAppMasterJar();
 
 		// Obtain allocated containers and launch
 		int allocatedContainers = 0;
@@ -221,17 +221,17 @@ public class MyApplicationMaster {
 		// and this ApplicationMaster will hang indefinitely.
 		int completedContainers = 0;
 		while (allocatedContainers < numTotalContainers) {
-			AllocateResponse response = amRMClient.allocate(0);
-			for (Container container : response.getAllocatedContainers()) {
+			final AllocateResponse response = amRMClient.allocate(0);
+			for (final Container container : response.getAllocatedContainers()) {
 				allocatedContainers++;
 
-				ContainerLaunchContext appContainer = createContainerLaunchContext(appMasterJar, containerEnv);
+				ContainerLaunchContext appContainer = this.createContainerLaunchContext(appMasterJar, containerEnv);
 				LOG.info("Launching container " + allocatedContainers);
 
 				nmClient.startContainer(container, appContainer);
 			}
 			for (ContainerStatus status : response.getCompletedContainersStatuses()) {
-				++completedContainers;
+				completedContainers++;
 				LOG.info("ContainerID:" + status.getContainerId() + ", state:" + status.getState().name());
 			}
 			Thread.sleep(100);
@@ -239,9 +239,9 @@ public class MyApplicationMaster {
 
 		// Now wait for the remaining containers to complete
 		while (completedContainers < numTotalContainers) {
-			AllocateResponse response = amRMClient.allocate(completedContainers / numTotalContainers);
-			for (ContainerStatus status : response.getCompletedContainersStatuses()) {
-				++completedContainers;
+			final AllocateResponse response = amRMClient.allocate(completedContainers / numTotalContainers);
+			for (final ContainerStatus status : response.getCompletedContainersStatuses()) {
+				completedContainers++;
 				LOG.info("ContainerID:" + status.getContainerId() + ", state:" + status.getState().name());
 			}
 			Thread.sleep(100);
@@ -255,14 +255,14 @@ public class MyApplicationMaster {
 	}
 
 	private LocalResource createAppMasterJar() throws IOException {
-		LocalResource appMasterJar = Records.newRecord(LocalResource.class);
-		if (!appJarPath.isEmpty()) {
+		final LocalResource appMasterJar = Records.newRecord(LocalResource.class);
+		if (!this.appJarPath.isEmpty()) {
 			appMasterJar.setType(LocalResourceType.FILE);
-			Path jarPath = new Path(appJarPath);
-			jarPath = FileSystem.get(conf).makeQualified(jarPath);
+			Path jarPath = new Path(this.appJarPath);
+			jarPath = FileSystem.get(this.conf).makeQualified(jarPath);
 			appMasterJar.setResource(ConverterUtils.getYarnUrlFromPath(jarPath));
-			appMasterJar.setTimestamp(appJarTimestamp);
-			appMasterJar.setSize(appJarPathLen);
+			appMasterJar.setTimestamp(this.appJarTimestamp);
+			appMasterJar.setSize(this.appJarPathLen);
 			appMasterJar.setVisibility(LocalResourceVisibility.PUBLIC);
 		}
 		return appMasterJar;
@@ -275,9 +275,9 @@ public class MyApplicationMaster {
 	 * @param containerEnv
 	 * @return
 	 */
-	private ContainerLaunchContext createContainerLaunchContext(LocalResource appMasterJar,
-			Map<String, String> containerEnv) {
-		ContainerLaunchContext appContainer = Records.newRecord(ContainerLaunchContext.class);
+	private ContainerLaunchContext createContainerLaunchContext(final LocalResource appMasterJar, final Map<String, String> containerEnv) 
+	{
+		final ContainerLaunchContext appContainer = Records.newRecord(ContainerLaunchContext.class);
 		appContainer.setLocalResources(Collections.singletonMap(Constants.AM_JAR_NAME, appMasterJar));
 		appContainer.setEnvironment(containerEnv);
 		appContainer.setCommands(Collections.singletonList("$JAVA_HOME/bin/java" + " -Xmx256M"
@@ -289,7 +289,7 @@ public class MyApplicationMaster {
 
 	public static void main(String[] args) throws Exception {
 		try {
-			MyApplicationMaster appMaster = new MyApplicationMaster();
+			final MyApplicationMaster appMaster = new MyApplicationMaster();
 			LOG.info("Initializing MyApplicationMaster");
 			boolean doRun = appMaster.init(args);
 			if (!doRun) {

@@ -41,7 +41,7 @@ public class HelloYarn {
 
 	// this is the payload called in the containers
 	public static void main(String[] args) {
-		HelloYarn helloYarn = new HelloYarn();
+		final HelloYarn helloYarn = new HelloYarn();
 		helloYarn.printMemoryStats();
 	}
 }

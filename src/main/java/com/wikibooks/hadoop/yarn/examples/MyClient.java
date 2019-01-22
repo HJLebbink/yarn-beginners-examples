@@ -109,9 +109,9 @@ public class MyClient {
 	private final long clientStartTime = System.currentTimeMillis();
 
 	// Configuration
-	private Configuration conf;
+	private final Configuration conf;
 
-	private YarnClient yarnClient;
+	private final YarnClient yarnClient;
 
 	// Application master specific info to register a new Application with RM/ASM
 	private String appName = "";
@@ -149,7 +149,7 @@ public class MyClient {
 	private long clientTimeout = 600000;
 
 	// Command line options
-	private Options opts;
+	private final Options opts;
 
 	/**
 	 * Constructor
@@ -157,37 +157,31 @@ public class MyClient {
 	 */
 	public MyClient() throws Exception {
 		LOG.info("constructor");
-		this.createYarnClient();
-		this.initOptions();
-	}
 
-	private void createYarnClient() {
 		this.yarnClient = YarnClient.createYarnClient();
 		this.conf = new YarnConfiguration();
-		this.yarnClient.init(conf);
-	}
+		this.yarnClient.init(this.conf);
 
-	private void initOptions() {
-		opts = new Options();
-		opts.addOption("appname", true, "Application Name. Default value - HelloYarn");
-		opts.addOption("priority", true, "Application Priority. Default 0");
-		opts.addOption("queue", true, "RM Queue in which this application is to be submitted");
-		opts.addOption("timeout", true, "Application timeout in milliseconds");
-		opts.addOption("master_memory", true, "Amount of memory in MB to be requested to run the application master");
-		opts.addOption("master_vcores", true, "Amount of virtual cores to be requested to run the application master");
-		opts.addOption("jar", true, "Jar file containing the application master");
-		opts.addOption("container_memory", true, "Amount of memory in MB to be requested to run the HelloYarn");
-		opts.addOption("container_vcores", true, "Amount of virtual cores to be requested to run the HelloYarn");
-		opts.addOption("num_containers", true, "No. of containers on which the HelloYarn needs to be executed");
-		opts.addOption("help", false, "Print usage");
+		this.opts = new Options();
+		this.opts.addOption("appname", true, "Application Name. Default value - HelloYarn");
+		this.opts.addOption("priority", true, "Application Priority. Default 0");
+		this.opts.addOption("queue", true, "RM Queue in which this application is to be submitted");
+		this.opts.addOption("timeout", true, "Application timeout in milliseconds");
+		this.opts.addOption("master_memory", true, "Amount of memory in MB to be requested to run the application master");
+		this.opts.addOption("master_vcores", true, "Amount of virtual cores to be requested to run the application master");
+		this.opts.addOption("jar", true, "Jar file containing the application master");
+		this.opts.addOption("container_memory", true, "Amount of memory in MB to be requested to run the HelloYarn");
+		this.opts.addOption("container_vcores", true, "Amount of virtual cores to be requested to run the HelloYarn");
+		this.opts.addOption("num_containers", true, "No. of containers on which the HelloYarn needs to be executed");
+		this.opts.addOption("help", false, "Print usage");
 	}
 
 	/**
 	 * Helper function to print out usage
 	 */
 	private void printUsage() {
-		LOG.info("printUsage");
-		new HelpFormatter().printHelp("Client", opts);
+		// LOG.info("printUsage");
+		new HelpFormatter().printHelp("Client", this.opts);
 	}
 
 	/**
@@ -197,15 +191,12 @@ public class MyClient {
 	 * @return Whether the init was successful to run the client
 	 * @throws org.apache.commons.cli.ParseException
 	 */
-	public boolean init(String[] args) throws ParseException {
-		LOG.info("init");
-		CommandLine cliParser = new GnuParser().parse(opts, args);
+	public boolean init(final String[] args) throws ParseException {
+		final CommandLine cliParser = new GnuParser().parse(this.opts, args);
 
 		if (args.length == 0) {
-
 			// LOG.info("No arguments provided, I'll make some up.");
 			throw new IllegalArgumentException("No args specified for client to initialize");
-
 		}
 
 		if (cliParser.hasOption("help")) {
@@ -223,18 +214,16 @@ public class MyClient {
 			throw new IllegalArgumentException(
 					"Invalid memory specified for application master, exiting. Specified memory=" + amMemory);
 		}
-		if (amVCores < 0) {
+		if (this.amVCores < 0) {
 			throw new IllegalArgumentException(
 					"Invalid virtual cores specified for application master, exiting. Specified virtual cores="
 							+ amVCores);
 		}
-
 		if (!cliParser.hasOption("jar")) {
 			throw new IllegalArgumentException("No jar file specified for application master");
 		}
 
 		this.appMasterJarPath = cliParser.getOptionValue("jar");
-
 		this.containerMemory = Integer.parseInt(cliParser.getOptionValue("container_memory", "10"));
 		this.containerVirtualCores = Integer.parseInt(cliParser.getOptionValue("container_vcores", "1"));
 		this.numContainers = Integer.parseInt(cliParser.getOptionValue("num_containers", "1"));
@@ -262,8 +251,8 @@ public class MyClient {
 		this.yarnClient.start();
 
 		// Get a new application id
-		YarnClientApplication app = yarnClient.createApplication();
-		GetNewApplicationResponse appResponse = app.getNewApplicationResponse();
+		final YarnClientApplication app = yarnClient.createApplication();
+		final GetNewApplicationResponse appResponse = app.getNewApplicationResponse();
 
 		{
 			final int maxMem = appResponse.getMaximumResourceCapability().getMemory();
@@ -287,8 +276,8 @@ public class MyClient {
 			}
 		}
 		// set the application name
-		ApplicationSubmissionContext appContext = app.getApplicationSubmissionContext();
-		ApplicationId appId = appContext.getApplicationId();
+		final ApplicationSubmissionContext appContext = app.getApplicationSubmissionContext();
+		final ApplicationId appId = appContext.getApplicationId();
 
 		appContext.setApplicationName(this.appName);
 
@@ -296,14 +285,14 @@ public class MyClient {
 			// Set up resource type requirements
 			// For now, both memory and vcores are supported, so we set memory and vcores
 			// requirements
-			Resource capability = Records.newRecord(Resource.class);
+			final Resource capability = Records.newRecord(Resource.class);
 			capability.setMemory(this.amMemory);
 			capability.setVirtualCores(this.amVCores);
 			appContext.setResource(capability);
 		}
 		// Set the priority for the application master
 		{
-			Priority pri = Records.newRecord(Priority.class);
+			final Priority pri = Records.newRecord(Priority.class);
 			pri.setPriority(this.amPriority);
 			appContext.setPriority(pri);
 		}
@@ -324,7 +313,7 @@ public class MyClient {
 		this.yarnClient.submitApplication(appContext);
 
 		// Monitor the application
-		return monitorApplication(appId);
+		return this.monitorApplication(appId);
 	}
 
 	private ContainerLaunchContext getAMContainerSpec(int appId) throws IOException, YarnException {
@@ -386,8 +375,8 @@ public class MyClient {
 
 	private void addToLocalResources(FileSystem fs, String fileSrcPath, String fileDstPath, int appId,
 			Map<String, LocalResource> localResources, String resources) throws IOException {
-		String suffix = appName + "/" + appId + "/" + fileDstPath;
-		Path dst = new Path(fs.getHomeDirectory(), suffix);
+		final String suffix = appName + "/" + appId + "/" + fileDstPath;
+		final Path dst = new Path(fs.getHomeDirectory(), suffix);
 		if (fileSrcPath == null) {
 			FSDataOutputStream ostream = null;
 			try {
@@ -406,36 +395,38 @@ public class MyClient {
 		localResources.put(fileDstPath, scRsrc);
 	}
 
-	private Map<String, String> getAMEnvironment(Map<String, LocalResource> localResources, FileSystem fs)
-			throws IOException {
-		Map<String, String> env = new HashMap<String, String>();
+	private Map<String, String> getAMEnvironment(Map<String, LocalResource> localResources, FileSystem fs) throws IOException 
+	{
+		final Map<String, String> env = new HashMap<String, String>();
 
 		// Set ApplicationMaster jar file
-		LocalResource appJarResource = localResources.get(Constants.AM_JAR_NAME);
-		Path hdfsAppJarPath = new Path(fs.getHomeDirectory(), appJarResource.getResource().getFile());
-		FileStatus hdfsAppJarStatus = fs.getFileStatus(hdfsAppJarPath);
-		long hdfsAppJarLength = hdfsAppJarStatus.getLen();
-		long hdfsAppJarTimestamp = hdfsAppJarStatus.getModificationTime();
+		{
+			final LocalResource appJarResource = localResources.get(Constants.AM_JAR_NAME);
+			final Path hdfsAppJarPath = new Path(fs.getHomeDirectory(), appJarResource.getResource().getFile());
+			final FileStatus hdfsAppJarStatus = fs.getFileStatus(hdfsAppJarPath);
+			final long hdfsAppJarLength = hdfsAppJarStatus.getLen();
+			final long hdfsAppJarTimestamp = hdfsAppJarStatus.getModificationTime();
 
-		env.put(Constants.AM_JAR_PATH, hdfsAppJarPath.toString());
-		env.put(Constants.AM_JAR_TIMESTAMP, Long.toString(hdfsAppJarTimestamp));
-		env.put(Constants.AM_JAR_LENGTH, Long.toString(hdfsAppJarLength));
-
+			env.put(Constants.AM_JAR_PATH, hdfsAppJarPath.toString());
+			env.put(Constants.AM_JAR_TIMESTAMP, Long.toString(hdfsAppJarTimestamp));
+			env.put(Constants.AM_JAR_LENGTH, Long.toString(hdfsAppJarLength));
+		}
 		// Add AppMaster.jar location to classpath
 		// At some point we should not be required to add
 		// the hadoop specific classpaths to the env.
 		// It should be provided out of the box.
 		// For now setting all required classpaths including
 		// the classpath to "." for the application jar
-		StringBuilder classPathEnv = new StringBuilder(Environment.CLASSPATH.$$())
-				.append(ApplicationConstants.CLASS_PATH_SEPARATOR).append("./*");
-		for (String c : conf.getStrings(YarnConfiguration.YARN_APPLICATION_CLASSPATH,
-				YarnConfiguration.DEFAULT_YARN_CROSS_PLATFORM_APPLICATION_CLASSPATH)) {
-			classPathEnv.append(ApplicationConstants.CLASS_PATH_SEPARATOR);
-			classPathEnv.append(c.trim());
+		{
+			final StringBuilder classPathEnv = new StringBuilder(Environment.CLASSPATH.$$())
+					.append(ApplicationConstants.CLASS_PATH_SEPARATOR).append("./*");
+			for (String c : conf.getStrings(YarnConfiguration.YARN_APPLICATION_CLASSPATH,
+					YarnConfiguration.DEFAULT_YARN_CROSS_PLATFORM_APPLICATION_CLASSPATH)) {
+				classPathEnv.append(ApplicationConstants.CLASS_PATH_SEPARATOR);
+				classPathEnv.append(c.trim());
+			}
+			env.put("CLASSPATH", classPathEnv.toString());
 		}
-		env.put("CLASSPATH", classPathEnv.toString());
-
 		return env;
 	}
 
@@ -459,30 +450,26 @@ public class MyClient {
 			}
 
 			// Get application report for the appId we are interested in
-			ApplicationReport report = yarnClient.getApplicationReport(appId);
-			YarnApplicationState state = report.getYarnApplicationState();
-			FinalApplicationStatus dsStatus = report.getFinalApplicationStatus();
+			final ApplicationReport report = this.yarnClient.getApplicationReport(appId);
+			final YarnApplicationState state = report.getYarnApplicationState();
+			final FinalApplicationStatus dsStatus = report.getFinalApplicationStatus();
+			
 			if (YarnApplicationState.FINISHED == state) {
 				if (FinalApplicationStatus.SUCCEEDED == dsStatus) {
-					LOG.info("Application has completed successfully. " + " Breaking monitoring loop : ApplicationId:"
-							+ appId.getId());
+					LOG.info("Application has completed successfully. " + " Breaking monitoring loop : ApplicationId:" + appId.getId());
 					return true;
 				} else {
-					LOG.info("Application did finished unsuccessfully." + " YarnState=" + state.toString()
-							+ ", DSFinalStatus=" + dsStatus.toString() + ". Breaking monitoring loop : ApplicationId:"
-							+ appId.getId());
+					LOG.info("Application did finished unsuccessfully." + " YarnState=" + state.toString() + ", DSFinalStatus=" + dsStatus.toString() + ". Breaking monitoring loop : ApplicationId:" + appId.getId());
 					return false;
 				}
 			} else if (YarnApplicationState.KILLED == state || YarnApplicationState.FAILED == state) {
-				LOG.info("Application did not finish." + " YarnState=" + state.toString() + ", DSFinalStatus="
-						+ dsStatus.toString() + ". Breaking monitoring loop : ApplicationId:" + appId.getId());
+				LOG.info("Application did not finish." + " YarnState=" + state.toString() + ", DSFinalStatus=" + dsStatus.toString() + ". Breaking monitoring loop : ApplicationId:" + appId.getId());
 				return false;
 			}
 
 			if (System.currentTimeMillis() > (clientStartTime + clientTimeout)) {
-				LOG.info("Reached client specified timeout for application. Killing application"
-						+ ". Breaking monitoring loop : ApplicationId:" + appId.getId());
-				forceKillApplication(appId);
+				LOG.info("Reached client specified timeout for application. Killing application" + ". Breaking monitoring loop : ApplicationId:" + appId.getId());
+				this.forceKillApplication(appId);
 				return false;
 			}
 		}
@@ -496,7 +483,7 @@ public class MyClient {
 	 * @throws java.io.IOException
 	 */
 	private void forceKillApplication(ApplicationId appId) throws YarnException, IOException {
-		yarnClient.killApplication(appId);
+		this.yarnClient.killApplication(appId);
 	}
 
 	/**
@@ -505,7 +492,7 @@ public class MyClient {
 	public static void main(String[] args) {
 		boolean result = false;
 		try {
-			MyClient client = new MyClient();
+			final MyClient client = new MyClient();
 			LOG.info("Initializing Client");
 			try {
 				boolean doRun = client.init(args);
