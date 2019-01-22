@@ -124,15 +124,16 @@ public class MyClient {
    * Constructor
    *
    */
-  public MyClient() throws Exception  {
-    createYarnClient();
-    initOptions();
+  public MyClient() throws Exception {
+	LOG.info("constructor");
+	this.createYarnClient();
+	this.initOptions();
   }
 
   private void createYarnClient() {
-    yarnClient = YarnClient.createYarnClient();
+    this.yarnClient = YarnClient.createYarnClient();
     this.conf = new YarnConfiguration();
-    yarnClient.init(conf);
+    this.yarnClient.init(conf);
   }
 
   private void initOptions() {
@@ -155,7 +156,8 @@ public class MyClient {
    * Helper function to print out usage
    */
   private void printUsage() {
-    new HelpFormatter().printHelp("Client", opts);
+	LOG.info("printUsage");
+	new HelpFormatter().printHelp("Client", opts);
   }
 
   /**
@@ -165,52 +167,55 @@ public class MyClient {
    * @throws org.apache.commons.cli.ParseException
    */
   public boolean init(String[] args) throws ParseException {
+	LOG.info("init");
+	CommandLine cliParser = new GnuParser().parse(opts, args);
 
-    CommandLine cliParser = new GnuParser().parse(opts, args);
+	if (args.length == 0) {
+		
+		//LOG.info("No arguments provided, I'll make some up.");
+		throw new IllegalArgumentException("No args specified for client to initialize");
+		
+		
+		
+	}
 
-    if (args.length == 0) {
-      throw new IllegalArgumentException("No args specified for client to initialize");
-    }
+	if (cliParser.hasOption("help")) {
+		printUsage();
+		return false;
+	}
 
-    if (cliParser.hasOption("help")) {
-      printUsage();
-      return false;
-    }
+	this.appName = cliParser.getOptionValue("appname", "HelloYarn");
+	this.amPriority = Integer.parseInt(cliParser.getOptionValue("priority", "0"));
+	this.amQueue = cliParser.getOptionValue("queue", "default");
+	this.amMemory = Integer.parseInt(cliParser.getOptionValue("master_memory", "10"));
+	this.amVCores = Integer.parseInt(cliParser.getOptionValue("master_vcores", "1"));
 
-    appName = cliParser.getOptionValue("appname", "HelloYarn");
-    amPriority = Integer.parseInt(cliParser.getOptionValue("priority", "0"));
-    amQueue = cliParser.getOptionValue("queue", "default");
-    amMemory = Integer.parseInt(cliParser.getOptionValue("master_memory", "10"));
-    amVCores = Integer.parseInt(cliParser.getOptionValue("master_vcores", "1"));
-
-    if (amMemory < 0) {
-      throw new IllegalArgumentException("Invalid memory specified for application master, exiting."
-          + " Specified memory=" + amMemory);
+    if (this.amMemory < 0) {
+      throw new IllegalArgumentException("Invalid memory specified for application master, exiting. Specified memory=" + amMemory);
     }
     if (amVCores < 0) {
-      throw new IllegalArgumentException("Invalid virtual cores specified for application master, exiting."
-          + " Specified virtual cores=" + amVCores);
+      throw new IllegalArgumentException("Invalid virtual cores specified for application master, exiting. Specified virtual cores=" + amVCores);
     }
 
     if (!cliParser.hasOption("jar")) {
       throw new IllegalArgumentException("No jar file specified for application master");
     }
 
-    appMasterJarPath = cliParser.getOptionValue("jar");
+    this.appMasterJarPath = cliParser.getOptionValue("jar");
 
-    containerMemory = Integer.parseInt(cliParser.getOptionValue("container_memory", "10"));
-    containerVirtualCores = Integer.parseInt(cliParser.getOptionValue("container_vcores", "1"));
-    numContainers = Integer.parseInt(cliParser.getOptionValue("num_containers", "1"));
+    this.containerMemory = Integer.parseInt(cliParser.getOptionValue("container_memory", "10"));
+    this.containerVirtualCores = Integer.parseInt(cliParser.getOptionValue("container_vcores", "1"));
+    this.numContainers = Integer.parseInt(cliParser.getOptionValue("num_containers", "1"));
 
-    if (containerMemory < 0 || containerVirtualCores < 0 || numContainers < 1) {
+    if (this.containerMemory < 0 || this.containerVirtualCores < 0 || this.numContainers < 1) {
       throw new IllegalArgumentException("Invalid no. of containers or container memory/vcores specified,"
           + " exiting."
-          + " Specified containerMemory=" + containerMemory
-          + ", containerVirtualCores=" + containerVirtualCores
-          + ", numContainer=" + numContainers);
+          + " Specified containerMemory=" + this.containerMemory
+          + ", containerVirtualCores=" + this.containerVirtualCores
+          + ", numContainer=" + this.numContainers);
     }
 
-    clientTimeout = Integer.parseInt(cliParser.getOptionValue("timeout", "600000"));
+    this.clientTimeout = Integer.parseInt(cliParser.getOptionValue("timeout", "600000"));
 
     return true;
   }
@@ -221,57 +226,56 @@ public class MyClient {
    * @throws java.io.IOException
    * @throws org.apache.hadoop.yarn.exceptions.YarnException
    */
-  public boolean run() throws IOException, YarnException {
+  public boolean run() throws IOException, YarnException
+  {
+	LOG.info("Running Client");
+	this.yarnClient.start();
 
-    LOG.info("Running Client");
-    yarnClient.start();
+	// Get a new application id
+	YarnClientApplication app = yarnClient.createApplication();
+	GetNewApplicationResponse appResponse = app.getNewApplicationResponse();
 
-    // Get a new application id
-    YarnClientApplication app = yarnClient.createApplication();
-    GetNewApplicationResponse appResponse = app.getNewApplicationResponse();
-
-    int maxMem = appResponse.getMaximumResourceCapability().getMemory();
-    LOG.info("Max mem capabililty of resources in this cluster " + maxMem);
-
-    // A resource ask cannot exceed the max.
-    if (amMemory > maxMem) {
-      LOG.info("AM memory specified above max threshold of cluster. Using max value."
-          + ", specified=" + amMemory
-          + ", max=" + maxMem);
-      amMemory = maxMem;
-    }
-
-    int maxVCores = appResponse.getMaximumResourceCapability().getVirtualCores();
-    LOG.info("Max virtual cores capabililty of resources in this cluster " + maxVCores);
-
-    if (amVCores > maxVCores) {
-      LOG.info("AM virtual cores specified above max threshold of cluster. "
-          + "Using max value." + ", specified=" + amVCores
-          + ", max=" + maxVCores);
-      amVCores = maxVCores;
-    }
-
+	{
+		final int maxMem = appResponse.getMaximumResourceCapability().getMemory();
+		LOG.info("Max mem capabililty of resources in this cluster " + maxMem);
+	
+		// A resource ask cannot exceed the max.
+		if (this.amMemory > maxMem) {
+			LOG.info("AM memory specified above max threshold of cluster. Using max value, specified=" + this.amMemory + ", max=" + maxMem);
+			this.amMemory = maxMem;
+		}
+	}
+	{
+		final int maxVCores = appResponse.getMaximumResourceCapability().getVirtualCores();
+		LOG.info("Max virtual cores capabililty of resources in this cluster " + maxVCores);
+	
+		if (amVCores > maxVCores) {
+			LOG.info("AM virtual cores specified above max threshold of cluster. Using max value." + ", specified=" + amVCores + ", max=" + maxVCores);
+			amVCores = maxVCores;
+		}
+	}
     // set the application name
     ApplicationSubmissionContext appContext = app.getApplicationSubmissionContext();
     ApplicationId appId = appContext.getApplicationId();
 
-    appContext.setApplicationName(appName);
+    appContext.setApplicationName(this.appName);
 
-    // Set up resource type requirements
-    // For now, both memory and vcores are supported, so we set memory and
-    // vcores requirements
-    Resource capability = Records.newRecord(Resource.class);
-    capability.setMemory(amMemory);
-    capability.setVirtualCores(amVCores);
-    appContext.setResource(capability);
-
+    {
+	    // Set up resource type requirements
+	    // For now, both memory and vcores are supported, so we set memory and vcores requirements
+	    Resource capability = Records.newRecord(Resource.class);
+	    capability.setMemory(this.amMemory);
+	    capability.setVirtualCores(this.amVCores);
+	    appContext.setResource(capability);
+    }
     // Set the priority for the application master
-    Priority pri = Records.newRecord(Priority.class);
-    pri.setPriority(amPriority);
-    appContext.setPriority(pri);
-
+    {
+	    Priority pri = Records.newRecord(Priority.class);
+	    pri.setPriority(this.amPriority);
+	    appContext.setPriority(pri);
+    }
     // Set the queue to which this application is to be submitted in the RM
-    appContext.setQueue(amQueue);
+    appContext.setQueue(this.amQueue);
 
     // Set the ContainerLaunchContext to describe the Container ith which the ApplicationMaster is launched.
     appContext.setAMContainerSpec(getAMContainerSpec(appId.getId()));
@@ -282,7 +286,7 @@ public class MyClient {
     // or an exception thrown to denote some form of a failure
     LOG.info("Submitting application to ASM");
 
-    yarnClient.submitApplication(appContext);
+    this.yarnClient.submitApplication(appContext);
 
     // Monitor the application
     return monitorApplication(appId);
@@ -302,8 +306,7 @@ public class MyClient {
     LOG.info("Copy App Master jar from local filesystem and add to local environment");
     // Copy the application master jar to the filesystem
     // Create a local resource to point to the destination jar path
-    addToLocalResources(fs, appMasterJarPath, Constants.AM_JAR_NAME, appId,
-        localResources, null);
+    addToLocalResources(fs, appMasterJarPath, Constants.AM_JAR_NAME, appId, localResources, null);
 
     // Set local resource info into app master container launch context
     amContainer.setLocalResources(localResources);
@@ -371,8 +374,7 @@ public class MyClient {
     localResources.put(fileDstPath, scRsrc);
   }
 
-  private Map<String, String> getAMEnvironment(Map<String, LocalResource> localResources
-      , FileSystem fs) throws IOException{
+  private Map<String, String> getAMEnvironment(Map<String, LocalResource> localResources, FileSystem fs) throws IOException{
     Map<String, String> env = new HashMap<String, String>();
 
     // Set ApplicationMaster jar file
@@ -467,7 +469,6 @@ public class MyClient {
   private void forceKillApplication(ApplicationId appId)
       throws YarnException, IOException {
     yarnClient.killApplication(appId);
-
   }
 
 
@@ -491,7 +492,7 @@ public class MyClient {
       }
       result = client.run();
     } catch (Throwable t) {
-      LOG.fatal("Error running CLient", t);
+      LOG.fatal("Error running Client", t);
       System.exit(1);
     }
     if (result) {
